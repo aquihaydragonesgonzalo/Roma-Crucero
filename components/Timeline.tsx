@@ -12,7 +12,7 @@ interface TimelineProps {
     onPreviewImage: (url: string, title: string) => void;
 }
 
-const Timeline: React.FC<TimelineProps> = ({ itinerary, onToggleComplete, onLocate, userLocation, onOpenAudioGuide, onPreviewImage }) => {
+const Timeline: React.FC<TimelineProps> = ({ itinerary, onToggleComplete, onLocate, onOpenAudioGuide, onPreviewImage }) => {
     const [, setTick] = useState(0);
 
     useEffect(() => {

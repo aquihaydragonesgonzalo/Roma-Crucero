@@ -1,5 +1,5 @@
 {
-  "name": "Roma 2026 Guide",
+  "name": "Roma CRUCERO",
   "description": "A personalized PWA guide for a cruise stopover in Rome 2026, featuring itineraries, maps, and audio guides.",
   "requestFramePermissions": [
     "geolocation"

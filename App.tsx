@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { CalendarClock, Map as MapIcon, Wallet, BookOpen, Anchor, X, Play, Square, Headphones } from 'lucide-react';
 import Timeline from './components/Timeline';
 import MapComponent from './components/MapComponent';
