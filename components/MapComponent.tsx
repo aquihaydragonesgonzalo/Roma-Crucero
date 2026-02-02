@@ -16,8 +16,31 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
 
     useEffect(() => {
         if (!mapContainerRef.current || mapInstanceRef.current) return;
-        const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([41.8902, 12.4922], 14);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
+
+        // 1. Definir las capas base
+        const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            maxZoom: 20
+        });
+
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+            maxZoom: 19
+        });
+
+        // 2. Inicializar el mapa con la capa "Calle" por defecto
+        const map = L.map(mapContainerRef.current, { 
+            zoomControl: false,
+            layers: [streetLayer] // Capa inicial
+        }).setView([41.8902, 12.4922], 14);
+
+        // 3. Añadir el control de capas (arriba a la derecha por defecto)
+        const baseMaps = {
+            "Calle": streetLayer,
+            "Satélite": satelliteLayer
+        };
+        L.control.layers(baseMaps, undefined, { position: 'topright' }).addTo(map);
+
         mapInstanceRef.current = map;
         
         return () => {
@@ -32,7 +55,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
         const map = mapInstanceRef.current;
         if (!map) return;
         
-        // Clear previous layers
+        // Clear previous layers (markers, lines, etc.)
         layersRef.current.forEach(layer => layer.remove());
         layersRef.current = [];
 
