@@ -1,3 +1,4 @@
+
 export const formatMinutes = (mins: number): string => {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
@@ -30,4 +31,34 @@ export const calculateTimeProgress = (startTime: string, endTime: string): numbe
     const totalRange = endMinutes - startMinutes;
     const elapsed = currentMinutes - startMinutes;
     return Math.min(100, Math.max(0, (elapsed / totalRange) * 100));
+};
+
+// Geolocation Math
+const toRad = (val: number) => val * Math.PI / 180;
+const toDeg = (val: number) => val * 180 / Math.PI;
+
+export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Radius of the earth in km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    return R * c; // Distance in km
+};
+
+export const calculateBearing = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const startLat = toRad(lat1);
+    const startLng = toRad(lon1);
+    const destLat = toRad(lat2);
+    const destLng = toRad(lon2);
+
+    const y = Math.sin(destLng - startLng) * Math.cos(destLat);
+    const x = Math.cos(startLat) * Math.sin(destLat) -
+              Math.sin(startLat) * Math.cos(destLat) * Math.cos(destLng - startLng);
+    
+    let brng = toDeg(Math.atan2(y, x));
+    return (brng + 360) % 360;
 };

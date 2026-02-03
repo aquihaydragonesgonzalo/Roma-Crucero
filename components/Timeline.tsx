@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, CheckCircle2, Circle, MapPin, AlertTriangle, AlertCircle, Navigation, Headphones, ExternalLink, Maximize2 } from 'lucide-react';
+import { Clock, CheckCircle2, Circle, MapPin, AlertTriangle, AlertCircle, Navigation, Headphones, ExternalLink, Maximize2, ArrowUp } from 'lucide-react';
 import { Activity, Coordinate } from '../types';
-import { formatMinutes, calculateDuration, calculateTimeProgress } from '../utils';
+import { formatMinutes, calculateDuration, calculateTimeProgress, calculateDistance, calculateBearing } from '../utils';
 
 interface TimelineProps {
     itinerary: Activity[];
@@ -12,18 +12,39 @@ interface TimelineProps {
     onPreviewImage: (url: string, title: string) => void;
 }
 
-const Timeline: React.FC<TimelineProps> = ({ itinerary, onToggleComplete, onLocate, onOpenAudioGuide, onPreviewImage }) => {
+const Timeline: React.FC<TimelineProps> = ({ itinerary, onToggleComplete, onLocate, userLocation, onOpenAudioGuide, onPreviewImage }) => {
     const [, setTick] = useState(0);
+    const [deviceHeading, setDeviceHeading] = useState<number>(0);
 
     useEffect(() => {
         const timer = setInterval(() => setTick(t => t + 1), 60000);
-        return () => clearInterval(timer);
+        
+        const handleOrientation = (event: DeviceOrientationEvent) => {
+            // alpha is the compass direction the device is facing in degrees
+            if (event.alpha) {
+                // Adjust for mobile browser differences (webkitCompassHeading for iOS)
+                const heading = (event as any).webkitCompassHeading || (360 - event.alpha);
+                setDeviceHeading(heading);
+            }
+        };
+
+        window.addEventListener('deviceorientation', handleOrientation, true);
+
+        return () => {
+            clearInterval(timer);
+            window.removeEventListener('deviceorientation', handleOrientation);
+        };
     }, []);
 
     const calculateGap = (endStrPrev: string, startStrNext: string): number => {
         const [endH, endM] = endStrPrev.split(':').map(Number);
         const [startH, startM] = startStrNext.split(':').map(Number);
         return (startH * 60 + startM) - (endH * 60 + endM);
+    };
+
+    const formatDistance = (km: number): string => {
+        if (km < 1) return `${Math.round(km * 1000)} m`;
+        return `${km.toFixed(1)} km`;
     };
 
     return (
@@ -38,6 +59,19 @@ const Timeline: React.FC<TimelineProps> = ({ itinerary, onToggleComplete, onLoca
                     const gap = prevAct ? calculateGap(prevAct.endTime, act.startTime) : 0;
                     const actProgress = calculateTimeProgress(act.startTime, act.endTime);
                     const gapProgress = prevAct ? calculateTimeProgress(prevAct.endTime, act.startTime) : 0;
+                    
+                    // Geospatial calculations
+                    let distanceStr = null;
+                    let arrowRotation = 0;
+                    
+                    if (userLocation && !act.completed) {
+                        const distKm = calculateDistance(userLocation.lat, userLocation.lng, act.coords.lat, act.coords.lng);
+                        distanceStr = formatDistance(distKm);
+                        
+                        const bearing = calculateBearing(userLocation.lat, userLocation.lng, act.coords.lat, act.coords.lng);
+                        // Arrow rotation: The bearing (North relative) minus where the phone is pointing
+                        arrowRotation = bearing - deviceHeading;
+                    }
 
                     return (
                         <React.Fragment key={act.id}>
@@ -87,7 +121,23 @@ const Timeline: React.FC<TimelineProps> = ({ itinerary, onToggleComplete, onLoca
                                             </div>
                                             {act.notes === 'CRITICAL' && <AlertTriangle className="text-red-500 animate-pulse" size={20} />}
                                         </div>
-                                        <div className="mb-3 text-sm text-gray-600 flex items-center flex-wrap gap-1"><MapPin size={14} className="mr-0.5 text-red-500" /> {act.locationName}</div>
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <div className="text-sm text-gray-600 flex items-center gap-1">
+                                                <MapPin size={14} className="mr-0.5 text-red-500" /> 
+                                                <span className="truncate max-w-[150px]">{act.locationName}</span>
+                                            </div>
+                                            
+                                            {/* Distance & Compass Badge */}
+                                            {distanceStr && (
+                                                <div className="flex items-center gap-1.5 bg-slate-800 text-white px-2 py-1 rounded-full shadow-md animate-[fadeIn_0.5s_ease-out]">
+                                                    <div style={{ transform: `rotate(${arrowRotation}deg)`, transition: 'transform 0.3s ease-out' }}>
+                                                        <ArrowUp size={12} strokeWidth={3} className="text-emerald-400" />
+                                                    </div>
+                                                    <span className="text-[10px] font-black tracking-wider">{distanceStr}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        
                                         <p className="text-sm text-gray-600 mb-4 whitespace-pre-line leading-relaxed">{act.description}</p>
                                         <div className="bg-slate-50 p-3 rounded-xl text-sm italic border-l-4 border-red-500 mb-4 shadow-inner text-slate-700 font-medium">"{act.keyDetails}"</div>
                                         {act.contingencyNote && <div className="bg-amber-100 border-2 border-amber-400 rounded-2xl p-4 my-4 flex items-start gap-3 shadow-md animate-pulse"><AlertCircle className="text-amber-700 flex-shrink-0 mt-1" size={20} /><div><p className="text-[11px] font-black text-amber-900 uppercase tracking-tighter mb-1">⚠️ PLAN DE CONTINGENCIA</p><p className="text-xs text-amber-950 font-bold leading-snug">{act.contingencyNote}</p></div></div>}
