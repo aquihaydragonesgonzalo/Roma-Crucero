@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { PhoneCall, Thermometer, ArrowRight, Sun, Cloud, CloudRain, CloudLightning, Compass, Ship, TrainFront, Footprints, Info, Languages, Volume2 } from 'lucide-react';
-import { Coordinate, WeatherData } from '../types';
+import { PhoneCall, Thermometer, ArrowRight, Sun, Cloud, CloudRain, CloudLightning, Compass, Ship, TrainFront, Footprints, Info, Languages, Volume2, FileDown } from 'lucide-react';
+import { Coordinate, WeatherData, Activity } from '../types';
 import { PRONUNCIATIONS } from '../constants';
+import { jsPDF } from 'jspdf';
 
 interface GuideProps {
     userLocation: Coordinate | null;
+    itinerary: Activity[];
 }
 
-const Guide: React.FC<GuideProps> = ({ userLocation }) => {
+const Guide: React.FC<GuideProps> = ({ userLocation, itinerary }) => {
     const [playing, setPlaying] = useState<string | null>(null);
     const [weather, setWeather] = useState<WeatherData | null>(null);
     const [loadingWeather, setLoadingWeather] = useState(true);
@@ -50,9 +52,202 @@ const Guide: React.FC<GuideProps> = ({ userLocation }) => {
         window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
+    const generatePDF = () => {
+        const doc = new jsPDF();
+
+        // Helper para limpiar texto de emojis y caracteres no soportados por las fuentes base de PDF
+        const cleanText = (text: string | undefined) => {
+            if (!text) return "";
+            return text
+                .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '') // Eliminar emojis
+                .replace(/€/g, 'EUR') // Reemplazar símbolo Euro si da problemas
+                .trim();
+        };
+        
+        // Configuración de la página
+        const pageWidth = doc.internal.pageSize.width; // 210mm para A4
+        const pageHeight = doc.internal.pageSize.height;
+        const marginX = 15;
+        const colTimeWidth = 25;
+        // Margen Izquierdo (15) + Columna Tiempo (25) + Hueco (5) + Texto (140) + Margen Derecho (25) = 210
+        // Reducimos el ancho del contenido para asegurar que no toque el borde derecho
+        const colContentWidth = 140; 
+        const colContentX = marginX + colTimeWidth + 5;
+        
+        let y = 30;
+
+        // --- ENCABEZADO ---
+        doc.setFillColor(153, 27, 27); // Rojo Fjord
+        doc.rect(0, 0, pageWidth, 24, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text("ROMA 2026 - ITINERARIO CRUCERO", marginX, 15);
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text("Guia de Escala", pageWidth - marginX, 15, { align: 'right' });
+
+        const checkPageBreak = (heightNeeded: number) => {
+            if (y + heightNeeded > pageHeight - 15) {
+                doc.addPage();
+                y = 20;
+                return true;
+            }
+            return false;
+        };
+
+        itinerary.forEach((act) => {
+            // --- PREPARACIÓN DE TEXTOS LIMPIOS ---
+            const titleRaw = cleanText(act.title).toUpperCase();
+            
+            let metaRaw = cleanText(act.locationName);
+            if (act.priceEUR > 0) metaRaw += ` - ${act.priceEUR} EUR`;
+            if (act.type) metaRaw += ` - ${cleanText(act.type).toUpperCase()}`;
+            if (act.audioGuideText) metaRaw += ` - AUDIOGUIA`;
+
+            const descRaw = cleanText(act.description);
+            const detailRaw = `Detalles: ${cleanText(act.keyDetails)}`;
+            
+            let notesRaw = "";
+            if (act.notes === 'CRITICAL' || act.contingencyNote) {
+                notesRaw = `IMPORTANTE: ${cleanText(act.contingencyNote || "Punto critico. Estar muy atento.")}`;
+            }
+
+            // --- CÁLCULO DE ALTURAS ---
+            // Es CRÍTICO establecer la fuente antes de calcular el tamaño para que `splitTextToSize` sea preciso.
+
+            // Título
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            const titleLines = doc.splitTextToSize(titleRaw, colContentWidth);
+            const titleHeight = titleLines.length * 5;
+
+            // Meta
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            const metaLines = doc.splitTextToSize(metaRaw, colContentWidth);
+            const metaHeight = metaLines.length * 4;
+
+            // Descripción
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            const descLines = doc.splitTextToSize(descRaw, colContentWidth);
+            const descHeight = descLines.length * 5;
+
+            // Detalles
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(9);
+            const detailLines = doc.splitTextToSize(detailRaw, colContentWidth);
+            const detailHeight = detailLines.length * 5;
+
+            // Notas
+            let notesLines: string[] = [];
+            let notesHeight = 0;
+            if (notesRaw) {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9);
+                notesLines = doc.splitTextToSize(notesRaw, colContentWidth);
+                notesHeight = notesLines.length * 5;
+            }
+
+            // Altura total
+            const totalItemHeight = titleHeight + metaHeight + descHeight + detailHeight + notesHeight + 12; // +12 padding
+
+            checkPageBreak(totalItemHeight);
+
+            // --- RENDERIZADO ---
+            
+            // Columna Tiempo
+            doc.setTextColor(50, 50, 50);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.text(act.startTime, marginX, y + 4);
+            
+            doc.setTextColor(100, 100, 100);
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'normal');
+            doc.text(act.endTime, marginX, y + 9);
+
+            // Línea Vertical
+            doc.setDrawColor(220, 220, 220);
+            doc.setLineWidth(0.5);
+            doc.line(marginX + colTimeWidth, y, marginX + colTimeWidth, y + totalItemHeight - 6);
+
+            // Columna Contenido
+            let currentY = y + 4;
+
+            // Título
+            doc.setTextColor(153, 27, 27);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.text(titleLines, colContentX, currentY);
+            currentY += titleHeight + 1;
+
+            // Meta
+            doc.setTextColor(80, 80, 80);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8);
+            doc.text(metaLines, colContentX, currentY);
+            currentY += metaHeight + 2;
+
+            // Descripción
+            doc.setTextColor(0, 0, 0);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.text(descLines, colContentX, currentY);
+            currentY += descHeight + 2;
+
+            // Detalles
+            doc.setTextColor(60, 60, 60);
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(9);
+            doc.text(detailLines, colContentX, currentY);
+            currentY += detailHeight + 2;
+
+            // Notas
+            if (notesLines.length > 0) {
+                doc.setTextColor(200, 0, 0);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9);
+                doc.text(notesLines, colContentX, currentY);
+            }
+
+            y += totalItemHeight;
+        });
+        
+        // Paginación
+        const totalPages = (doc as any).internal.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text(`Pagina ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        }
+
+        doc.save('Itinerario_Roma_2026.pdf');
+    };
+
     return (
         <div className="pb-32 px-4 pt-6 max-w-lg mx-auto h-full overflow-y-auto no-scrollbar fade-in">
             <h2 className="text-2xl font-bold text-red-800 mb-6 uppercase tracking-tight">Guía Roma</h2>
+            
+            {/* Generate PDF Button */}
+            <div className="mb-8">
+                <button 
+                    onClick={generatePDF}
+                    className="w-full bg-slate-800 text-white p-4 rounded-2xl shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-transform group border border-slate-700"
+                >
+                    <div className="bg-white/10 p-2 rounded-full group-hover:bg-white/20 transition-colors">
+                        <FileDown size={24} className="text-emerald-400" />
+                    </div>
+                    <div className="text-left">
+                        <span className="block text-xs text-slate-400 font-bold uppercase tracking-wider">Documentación</span>
+                        <span className="block text-sm font-black uppercase tracking-tight leading-none">Descargar Itinerario PDF</span>
+                    </div>
+                </button>
+            </div>
             
             <div className="mb-8">
                 <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center uppercase tracking-widest px-1">
