@@ -1,3 +1,4 @@
+
 export interface Coordinate {
     lat: number;
     lng: number;
@@ -25,9 +26,11 @@ export interface Activity {
 }
 
 export interface Waypoint {
+    id?: string;
     name: string;
     lat: number;
     lng: number;
+    isUserCreated?: boolean;
 }
 
 export interface Pronunciation {

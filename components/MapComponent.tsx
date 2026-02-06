@@ -1,18 +1,21 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { Activity, Coordinate } from '../types';
+import { Activity, Coordinate, Waypoint } from '../types';
 import { GPX_WAYPOINTS, ROMAN_WALK_TRACK_POINTS } from '../constants';
 
 interface MapComponentProps {
     activities: Activity[];
     userLocation: Coordinate | null;
     focusedLocation: Coordinate | null;
+    userWaypoints?: Waypoint[];
+    onAddUserWaypoint?: (name: string, lat: number, lng: number) => void;
 }
 
-const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, focusedLocation }) => {
+const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, focusedLocation, userWaypoints = [], onAddUserWaypoint }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<L.Map | null>(null);
     const layersRef = useRef<L.Layer[]>([]);
+    const clickHandlerRef = useRef<((e: L.LeafletMouseEvent) => void) | null>(null);
 
     useEffect(() => {
         if (!mapContainerRef.current || mapInstanceRef.current) return;
@@ -28,13 +31,13 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
             maxZoom: 19
         });
 
-        // 2. Inicializar el mapa con la capa "Calle" por defecto
+        // 2. Inicializar el mapa
         const map = L.map(mapContainerRef.current, { 
             zoomControl: false,
-            layers: [streetLayer] // Capa inicial
+            layers: [streetLayer] 
         }).setView([41.8902, 12.4922], 14);
 
-        // 3. Añadir el control de capas (arriba a la derecha por defecto)
+        // 3. Control de capas
         const baseMaps = {
             "Calle": streetLayer,
             "Satélite": satelliteLayer
@@ -51,14 +54,43 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
         };
     }, []);
 
+    // Effect for Click Handler (Adding Waypoints)
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map || !onAddUserWaypoint) return;
+
+        // Limpiar handler anterior
+        if (clickHandlerRef.current) {
+            map.off('click', clickHandlerRef.current);
+        }
+
+        // Crear nuevo handler
+        clickHandlerRef.current = (e: L.LeafletMouseEvent) => {
+            const name = window.prompt("Nombre para este punto de interés:");
+            if (name && name.trim().length > 0) {
+                onAddUserWaypoint(name, e.latlng.lat, e.latlng.lng);
+            }
+        };
+
+        map.on('click', clickHandlerRef.current);
+
+        return () => {
+            if (map && clickHandlerRef.current) {
+                map.off('click', clickHandlerRef.current);
+            }
+        };
+    }, [onAddUserWaypoint]);
+
+    // Effect for Rendering Layers
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map) return;
         
-        // Clear previous layers (markers, lines, etc.)
+        // Clear previous layers
         layersRef.current.forEach(layer => layer.remove());
         layersRef.current = [];
 
+        // 1. Render Activities (Red/Standard)
         activities.forEach(act => {
             const marker = L.marker([act.coords.lat, act.coords.lng]).addTo(map);
             
@@ -95,6 +127,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
             layersRef.current.push(marker);
         });
 
+        // 2. Render System GPX Waypoints (Red circles)
         GPX_WAYPOINTS.forEach(wpt => {
             const circleMarker = L.circleMarker([wpt.lat, wpt.lng], {
                 radius: 6,
@@ -108,13 +141,37 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
             layersRef.current.push(circleMarker);
         });
 
+        // 3. Render User Waypoints (Emerald circles)
+        userWaypoints.forEach(uWpt => {
+             const userMarker = L.circleMarker([uWpt.lat, uWpt.lng], {
+                radius: 8,
+                fillColor: "#10b981", // Emerald 500
+                color: "#fff",
+                weight: 3,
+                opacity: 1,
+                fillOpacity: 0.9
+            }).addTo(map);
+            
+            const popupContent = `
+                <div style="font-family: 'Roboto Condensed', sans-serif; padding: 4px;">
+                    <p style="font-size: 13px; font-weight: bold; color: #064e3b; margin: 0 0 8px 0;">${uWpt.name}</p>
+                    <button onclick="window.deleteUserWaypoint('${uWpt.id}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: bold; width: 100%;">
+                        ELIMINAR
+                    </button>
+                </div>
+            `;
+            
+            userMarker.bindPopup(popupContent);
+            layersRef.current.push(userMarker);
+        });
+
         L.polyline(ROMAN_WALK_TRACK_POINTS, { color: '#991B1B', weight: 4, opacity: 0.7, dashArray: '8, 12' }).addTo(map);
         
         if (userLocation) {
             const uMarker = L.circleMarker([userLocation.lat, userLocation.lng], { radius: 8, color: 'white', weight: 3, fillColor: '#3b82f6', fillOpacity: 1 }).addTo(map);
             layersRef.current.push(uMarker);
         }
-    }, [activities, userLocation]);
+    }, [activities, userLocation, userWaypoints]);
 
     useEffect(() => {
         if (mapInstanceRef.current && focusedLocation) {
@@ -122,7 +179,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
         }
     }, [focusedLocation]);
 
-    return <div ref={mapContainerRef} className="w-full h-full z-0" />;
+    return <div ref={mapContainerRef} className="w-full h-full z-0 cursor-crosshair" />;
 };
 
 export default MapComponent;

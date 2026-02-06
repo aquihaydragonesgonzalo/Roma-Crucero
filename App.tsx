@@ -5,12 +5,13 @@ import MapComponent from './components/MapComponent';
 import Budget from './components/Budget';
 import Guide from './components/Guide';
 import { INITIAL_ITINERARY, SHIP_ONBOARD_TIME } from './constants';
-import { Activity, Coordinate } from './types';
+import { Activity, Coordinate, Waypoint } from './types';
 
 // Add the window type extension for the global function
 declare global {
   interface Window {
     openAudioGuideFromMap: (id: string) => void;
+    deleteUserWaypoint: (id: string) => void;
   }
 }
 
@@ -23,8 +24,21 @@ const App = () => {
     const [audioActivity, setAudioActivity] = useState<Activity | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [previewImage, setPreviewImage] = useState<{url: string; title: string} | null>(null);
+    
+    // State for user defined waypoints
+    const [userWaypoints, setUserWaypoints] = useState<Waypoint[]>([]);
 
     useEffect(() => {
+        // Load User Waypoints from LS
+        const savedWaypoints = localStorage.getItem('roma_user_waypoints');
+        if (savedWaypoints) {
+            try {
+                setUserWaypoints(JSON.parse(savedWaypoints));
+            } catch (e) {
+                console.error("Error loading waypoints", e);
+            }
+        }
+
         // Expose function for Map Popups
         window.openAudioGuideFromMap = (id: string) => {
             const act = itinerary.find(a => a.id === id);
@@ -33,15 +47,21 @@ const App = () => {
             }
         };
 
+        window.deleteUserWaypoint = (id: string) => {
+            if(window.confirm("¿Eliminar este marcador personal?")) {
+                setUserWaypoints(prev => {
+                    const updated = prev.filter(wp => wp.id !== id);
+                    localStorage.setItem('roma_user_waypoints', JSON.stringify(updated));
+                    return updated;
+                });
+            }
+        };
+
         const timer = setInterval(() => {
             const now = new Date();
             const [h, m] = SHIP_ONBOARD_TIME.split(':').map(Number);
             const target = new Date();
             target.setHours(h, m, 0, 0);
-            
-            // If it's already past the time today, target tomorrow? 
-            // The logic from original app assumes same-day or ignores date object beyond time
-            // We'll stick to simple diff based on today's date + SHIP_ONBOARD_TIME
             
             const diff = target.getTime() - now.getTime();
             if (diff <= 0) setCountdown("¡A BORDO!");
@@ -77,6 +97,19 @@ const App = () => {
         setItinerary(itinerary.map(a => a.id === id ? {...a, completed: !a.completed} : a));
     };
 
+    const handleAddUserWaypoint = (name: string, lat: number, lng: number) => {
+        const newPoint: Waypoint = {
+            id: Date.now().toString(),
+            name,
+            lat,
+            lng,
+            isUserCreated: true
+        };
+        const updated = [...userWaypoints, newPoint];
+        setUserWaypoints(updated);
+        localStorage.setItem('roma_user_waypoints', JSON.stringify(updated));
+    };
+
     return (
         <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
             <header className="bg-red-950 text-white p-4 shadow-xl z-20 flex justify-between items-center shrink-0">
@@ -106,7 +139,15 @@ const App = () => {
                         />
                     </div>
                 )}
-                {activeTab === 'map' && <MapComponent activities={itinerary} userLocation={userLocation} focusedLocation={mapFocus} />}
+                {activeTab === 'map' && (
+                    <MapComponent 
+                        activities={itinerary} 
+                        userLocation={userLocation} 
+                        focusedLocation={mapFocus} 
+                        userWaypoints={userWaypoints}
+                        onAddUserWaypoint={handleAddUserWaypoint}
+                    />
+                )}
                 {activeTab === 'budget' && <Budget itinerary={itinerary} />}
                 {activeTab === 'guide' && <Guide userLocation={userLocation} itinerary={itinerary} />}
             </main>
