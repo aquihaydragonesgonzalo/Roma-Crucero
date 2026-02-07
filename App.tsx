@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { CalendarClock, Map as MapIcon, Wallet, BookOpen, Anchor, X, Play, Square, Headphones } from 'lucide-react';
+import { useState, useEffect, FormEvent } from 'react';
+import { CalendarClock, Map as MapIcon, Wallet, BookOpen, Anchor, X, Play, Square, Headphones, MapPin, Save } from 'lucide-react';
 import Timeline from './components/Timeline';
 import MapComponent from './components/MapComponent';
 import Budget from './components/Budget';
@@ -27,6 +27,10 @@ const App = () => {
     
     // State for user defined waypoints
     const [userWaypoints, setUserWaypoints] = useState<Waypoint[]>([]);
+    
+    // UI State for Modal
+    const [isWaypointModalOpen, setIsWaypointModalOpen] = useState(false);
+    const [tempMarkerCoords, setTempMarkerCoords] = useState<Coordinate | null>(null);
 
     useEffect(() => {
         // Load User Waypoints from LS
@@ -97,18 +101,34 @@ const App = () => {
         setItinerary(itinerary.map(a => a.id === id ? {...a, completed: !a.completed} : a));
     };
 
-    const handleAddUserWaypoint = (name: string, lat: number, lng: number, description?: string) => {
-        const newPoint: Waypoint = {
-            id: Date.now().toString(),
-            name,
-            description,
-            lat,
-            lng,
-            isUserCreated: true
-        };
-        const updated = [...userWaypoints, newPoint];
-        setUserWaypoints(updated);
-        localStorage.setItem('roma_user_waypoints', JSON.stringify(updated));
+    // Triggered when user clicks the map component
+    const handleMapClick = (lat: number, lng: number) => {
+        setTempMarkerCoords({ lat, lng });
+        setIsWaypointModalOpen(true);
+    };
+
+    // Form Submit Handler
+    const handleSaveWaypoint = (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        const name = formData.get('name') as string;
+        const description = formData.get('description') as string;
+
+        if (name && tempMarkerCoords) {
+            const newPoint: Waypoint = {
+                id: Date.now().toString(),
+                name,
+                description,
+                lat: tempMarkerCoords.lat,
+                lng: tempMarkerCoords.lng,
+                isUserCreated: true
+            };
+            const updated = [...userWaypoints, newPoint];
+            setUserWaypoints(updated);
+            localStorage.setItem('roma_user_waypoints', JSON.stringify(updated));
+            setIsWaypointModalOpen(false);
+            setTempMarkerCoords(null);
+        }
     };
 
     return (
@@ -146,12 +166,74 @@ const App = () => {
                         userLocation={userLocation} 
                         focusedLocation={mapFocus} 
                         userWaypoints={userWaypoints}
-                        onAddUserWaypoint={handleAddUserWaypoint}
+                        onMapClick={handleMapClick}
                     />
                 )}
                 {activeTab === 'budget' && <Budget itinerary={itinerary} />}
                 {activeTab === 'guide' && <Guide userLocation={userLocation} itinerary={itinerary} />}
             </main>
+
+            {/* Modal Add Waypoint */}
+            {isWaypointModalOpen && (
+                <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease-out]">
+                    <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden scale-[0.95] animate-[fadeIn_0.3s_ease-out_forwards]">
+                        <div className="bg-gradient-to-r from-red-950 to-red-900 p-5 flex items-center justify-between">
+                            <div className="flex items-center gap-3 text-white">
+                                <div className="p-2 bg-white/10 rounded-full">
+                                    <MapPin size={20} className="text-red-400" />
+                                </div>
+                                <h3 className="font-bold text-lg leading-none">Nuevo Marcador</h3>
+                            </div>
+                            <button 
+                                onClick={() => setIsWaypointModalOpen(false)}
+                                className="text-white/60 hover:text-white transition-colors"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSaveWaypoint} className="p-6">
+                            <div className="mb-4">
+                                <label htmlFor="wp-name" className="block text-xs font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-wider">Nombre del Punto</label>
+                                <input 
+                                    id="wp-name"
+                                    name="name" 
+                                    type="text" 
+                                    autoFocus
+                                    required
+                                    placeholder="Ej: Cafetería bonita" 
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all placeholder:font-normal"
+                                />
+                            </div>
+                            <div className="mb-6">
+                                <label htmlFor="wp-desc" className="block text-xs font-black uppercase text-slate-400 mb-1.5 ml-1 tracking-wider">Descripción (Opcional)</label>
+                                <textarea 
+                                    id="wp-desc"
+                                    name="description" 
+                                    rows={3}
+                                    placeholder="Notas sobre este lugar..." 
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all resize-none"
+                                />
+                            </div>
+                            <div className="flex gap-3">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setIsWaypointModalOpen(false)}
+                                    className="flex-1 py-3.5 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-colors uppercase text-xs tracking-wider"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="flex-1 py-3.5 bg-red-900 text-white rounded-xl font-bold shadow-lg shadow-red-900/20 active:scale-95 transition-transform flex items-center justify-center gap-2 uppercase text-xs tracking-wider"
+                                >
+                                    <Save size={16} />
+                                    Guardar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Modal Imagen FullScreen */}
             {previewImage && (

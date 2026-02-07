@@ -8,10 +8,10 @@ interface MapComponentProps {
     userLocation: Coordinate | null;
     focusedLocation: Coordinate | null;
     userWaypoints?: Waypoint[];
-    onAddUserWaypoint?: (name: string, lat: number, lng: number, description?: string) => void;
+    onMapClick?: (lat: number, lng: number) => void;
 }
 
-const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, focusedLocation, userWaypoints = [], onAddUserWaypoint }) => {
+const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, focusedLocation, userWaypoints = [], onMapClick }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<L.Map | null>(null);
     const layersRef = useRef<L.Layer[]>([]);
@@ -54,10 +54,10 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
         };
     }, []);
 
-    // Effect for Click Handler (Adding Waypoints)
+    // Effect for Click Handler (Reporting Clicks to Parent)
     useEffect(() => {
         const map = mapInstanceRef.current;
-        if (!map || !onAddUserWaypoint) return;
+        if (!map || !onMapClick) return;
 
         // Limpiar handler anterior
         if (clickHandlerRef.current) {
@@ -66,11 +66,8 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
 
         // Crear nuevo handler
         clickHandlerRef.current = (e: L.LeafletMouseEvent) => {
-            const name = window.prompt("Nombre para este punto de interés:");
-            if (name && name.trim().length > 0) {
-                const description = window.prompt("Descripción (opcional):");
-                onAddUserWaypoint(name, e.latlng.lat, e.latlng.lng, description || undefined);
-            }
+            // Simply report the click coordinates to the parent
+            onMapClick(e.latlng.lat, e.latlng.lng);
         };
 
         map.on('click', clickHandlerRef.current);
@@ -80,7 +77,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
                 map.off('click', clickHandlerRef.current);
             }
         };
-    }, [onAddUserWaypoint]);
+    }, [onMapClick]);
 
     // Effect for Rendering Layers
     useEffect(() => {
