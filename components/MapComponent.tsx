@@ -8,7 +8,7 @@ interface MapComponentProps {
     userLocation: Coordinate | null;
     focusedLocation: Coordinate | null;
     userWaypoints?: Waypoint[];
-    onAddUserWaypoint?: (name: string, lat: number, lng: number) => void;
+    onAddUserWaypoint?: (name: string, lat: number, lng: number, description?: string) => void;
 }
 
 const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, focusedLocation, userWaypoints = [], onAddUserWaypoint }) => {
@@ -68,7 +68,8 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
         clickHandlerRef.current = (e: L.LeafletMouseEvent) => {
             const name = window.prompt("Nombre para este punto de interés:");
             if (name && name.trim().length > 0) {
-                onAddUserWaypoint(name, e.latlng.lat, e.latlng.lng);
+                const description = window.prompt("Descripción (opcional):");
+                onAddUserWaypoint(name, e.latlng.lat, e.latlng.lng, description || undefined);
             }
         };
 
@@ -153,10 +154,11 @@ const MapComponent: React.FC<MapComponentProps> = ({ activities, userLocation, f
             }).addTo(map);
             
             const popupContent = `
-                <div style="font-family: 'Roboto Condensed', sans-serif; padding: 4px;">
-                    <p style="font-size: 13px; font-weight: bold; color: #064e3b; margin: 0 0 8px 0;">${uWpt.name}</p>
-                    <button onclick="window.deleteUserWaypoint('${uWpt.id}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: bold; width: 100%;">
-                        ELIMINAR
+                <div style="font-family: 'Roboto Condensed', sans-serif; padding: 4px; min-width: 150px;">
+                    <p style="font-size: 14px; font-weight: bold; color: #064e3b; margin: 0 0 4px 0;">${uWpt.name}</p>
+                    ${uWpt.description ? `<p style="font-size: 12px; color: #475569; margin: 0 0 8px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">${uWpt.description}</p>` : ''}
+                    <button onclick="window.deleteUserWaypoint('${uWpt.id}')" style="background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; font-size: 10px; cursor: pointer; font-weight: bold; width: 100%; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px;">
+                        Eliminar Marcador
                     </button>
                 </div>
             `;

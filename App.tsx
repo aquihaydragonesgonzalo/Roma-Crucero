@@ -97,10 +97,11 @@ const App = () => {
         setItinerary(itinerary.map(a => a.id === id ? {...a, completed: !a.completed} : a));
     };
 
-    const handleAddUserWaypoint = (name: string, lat: number, lng: number) => {
+    const handleAddUserWaypoint = (name: string, lat: number, lng: number, description?: string) => {
         const newPoint: Waypoint = {
             id: Date.now().toString(),
             name,
+            description,
             lat,
             lng,
             isUserCreated: true
