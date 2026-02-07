@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PhoneCall, Thermometer, ArrowRight, Sun, Cloud, CloudRain, CloudLightning, Compass, Ship, TrainFront, Footprints, Info, Languages, Volume2, FileDown } from 'lucide-react';
+import { PhoneCall, Thermometer, ArrowRight, Sun, Cloud, CloudRain, CloudLightning, Compass, Ship, TrainFront, Footprints, Info, Languages, Volume2, FileDown, CalendarDays } from 'lucide-react';
 import { Coordinate, WeatherData, Activity } from '../types';
 import { PRONUNCIATIONS } from '../constants';
 import { jsPDF } from 'jspdf';
@@ -350,6 +350,35 @@ const Guide: React.FC<GuideProps> = ({ userLocation, itinerary }) => {
                                     return null;
                                 })}
                             </div>
+                        </div>
+
+                        {/* 5-Day Forecast */}
+                        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-lg divide-y divide-slate-100 overflow-hidden">
+                            <div className="bg-slate-50/50 p-4 border-b border-slate-100 flex items-center gap-2">
+                                <CalendarDays size={14} className="text-fjord-400" />
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Próximos 5 días</span>
+                            </div>
+                            {weather.daily.time.slice(0, 5).map((date, i) => {
+                                // Appending T12:00:00 to avoid timezone issues shifting the day
+                                const d = new Date(date + 'T12:00:00');
+                                const dayName = d.toLocaleDateString('es-ES', { weekday: 'long' });
+                                
+                                return (
+                                    <div key={date} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                        <div className="w-24">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{dayName}</p>
+                                            <p className="text-sm font-bold text-slate-700 leading-none mt-0.5 capitalize">{d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</p>
+                                        </div>
+                                        <div className="flex items-center justify-center bg-slate-50 rounded-2xl w-10 h-10 border border-slate-100 shadow-sm text-slate-600">
+                                            {getWeatherIcon(weather.daily.weathercode[i], 20)}
+                                        </div>
+                                        <div className="flex items-center justify-end gap-3 min-w-[80px]">
+                                            <span className="text-base font-black text-slate-800">{Math.round(weather.daily.temperature_2m_max[i])}°</span>
+                                            <span className="text-xs font-bold text-slate-400 opacity-60">{Math.round(weather.daily.temperature_2m_min[i])}°</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 ) : null}
